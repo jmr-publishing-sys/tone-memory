@@ -1,58 +1,51 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { useState } from 'react'
+import { supabase } from './lib/supabase'
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      setLoading(false)
+  const signIn = async () => {
+    setLoading(true)
+    setMessage(null)
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null)
-      }
-    )
-
-    return () => {
-      listener.subscription.unsubscribe()
+    if (error) {
+      setMessage(`Error: ${error.message}`)
+    } else {
+      setMessage('Check your email for the sign-in link.')
     }
-  }, [])
 
-  async function signIn() {
-    await supabase.auth.signInWithOtp({
-      email: prompt('Enter your email') || '',
-    })
+    setLoading(false)
   }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  if (loading) return <p>Loading...</p>
 
   return (
-    <main style={{ padding: 24 }}>
+    <main style={{ padding: 32 }}>
       <h1>Tone Memory</h1>
       <p>Your personal guitar tone library.</p>
 
-      {!user ? (
-        <button onClick={signIn}>Sign in with Email</button>
-      ) : (
-        <>
-          <p>Signed in as: {user.email}</p>
-          <button onClick={signOut}>Sign out</button>
-        </>
+      <input
+        type="email"
+        placeholder="you@email.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ padding: 8, width: 260 }}
+      />
+
+      <br /><br />
+
+      <button onClick={signIn} disabled={loading}>
+        {loading ? 'Sending...' : 'Sign in with Email'}
+      </button>
+
+      {message && (
+        <p style={{ marginTop: 16 }}>{message}</p>
       )}
     </main>
   )
