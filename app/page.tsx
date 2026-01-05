@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -9,42 +9,62 @@ const supabase = createClient(
 )
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null)
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const signIn = async () => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+      setLoading(false)
     })
 
-    if (!error) {
-      setSent(true)
-    } else {
-      alert(error.message)
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null)
+      }
+    )
+
+    return () => {
+      listener.subscription.unsubscribe()
     }
+  }, [])
+
+  const signIn = async () => {
+    await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'https://tone-memory.vercel.app/auth/callback',
+      },
+    })
+    alert('Magic link sent!')
+  }
+
+  if (loading) {
+    return <p style={{ padding: 40 }}>Loading…</p>
+  }
+
+  if (user) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h1>✅ Signed in</h1>
+        <p>{user.email}</p>
+        <button onClick={() => supabase.auth.signOut()}>
+          Sign out
+        </button>
+      </div>
+    )
   }
 
   return (
-    <main style={{ padding: 40 }}>
+    <div style={{ padding: 40 }}>
       <h1>Tone Memory</h1>
-
-      {!sent ? (
-        <>
-          <input
-            type="email"
-            placeholder="you@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ padding: 8, marginRight: 8 }}
-          />
-          <button onClick={signIn}>Send Magic Link</button>
-        </>
-      ) : (
-        <p>Check your email for the magic link.</p>
-      )}
-    </main>
+      <input
+        placeholder="you@email.com"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+      />
+      <button onClick={signIn}>Sign in with magic link</button>
+    </div>
   )
 }
