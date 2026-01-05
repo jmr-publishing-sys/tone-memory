@@ -1,11 +1,16 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { supabase } from "./lib/supabase";
+import { useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export default function Home() {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
 
   const signIn = async () => {
     const { error } = await supabase.auth.signInWithOtp({
@@ -13,32 +18,33 @@ export default function Home() {
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
-    });
+    })
 
-    if (error) {
-      setMessage(error.message);
+    if (!error) {
+      setSent(true)
     } else {
-      setMessage("Check your email for the login link.");
+      alert(error.message)
     }
-  };
+  }
 
   return (
     <main style={{ padding: 40 }}>
       <h1>Tone Memory</h1>
-      <p>Your personal guitar tone library.</p>
 
-      <input
-        type="email"
-        placeholder="you@email.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        style={{ padding: 8, marginRight: 8 }}
-      />
-
-      <button onClick={signIn}>Sign in with Email</button>
-
-      {message && <p>{message}</p>}
+      {!sent ? (
+        <>
+          <input
+            type="email"
+            placeholder="you@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ padding: 8, marginRight: 8 }}
+          />
+          <button onClick={signIn}>Send Magic Link</button>
+        </>
+      ) : (
+        <p>Check your email for the magic link.</p>
+      )}
     </main>
-  );
+  )
 }
-
