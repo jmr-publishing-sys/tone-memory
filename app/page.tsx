@@ -8,143 +8,67 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-type Tone = {
-  id: string
-  name: string
-  amp: string
-  cab: string
-  guitar: string
-  pedals: string
-  notes: string
-  tags: string
-}
-
 export default function Home() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [tones, setTones] = useState<Tone[]>([])
-
-  const [form, setForm] = useState({
-    name: '',
-    amp: '',
-    cab: '',
-    guitar: '',
-    pedals: '',
-    notes: '',
-    tags: '',
-  })
+  const [email, setEmail] = useState('')
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [status, setStatus] = useState<string>('')
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
-      setLoading(false)
-      if (data.session?.user) loadTones()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? null)
     })
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) loadTones()
-      }
-    )
-
-    return () => {
-      listener.subscription.unsubscribe()
-    }
   }, [])
 
-  const loadTones = async () => {
-    const { data } = await supabase
-      .from('tones')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (data) setTones(data)
-  }
-
-  const saveTone = async () => {
-    if (!form.name) return alert('Name your tone first')
-
-    const { error } = await supabase.from('tones').insert([
-      {
-        ...form,
-        user_id: user.id,
-        is_public: false,
+  async function sendLink() {
+    setStatus('Sending magic link...')
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
-    ])
-
+    })
     if (error) {
-      alert(error.message)
+      setStatus(`Error: ${error.message}`)
     } else {
-      setForm({
-        name: '',
-        amp: '',
-        cab: '',
-        guitar: '',
-        pedals: '',
-        notes: '',
-        tags: '',
-      })
-      loadTones()
+      setStatus('Check your email for the magic link (check Junk too).')
     }
   }
 
-  if (loading) return <p style={{ padding: 40 }}>Loading…</p>
-
-  if (!user) {
-    return <p style={{ padding: 40 }}>Please sign in</p>
+  async function signOut() {
+    await supabase.auth.signOut()
+    setUserEmail(null)
+    setStatus('Signed out.')
   }
 
   return (
-    <div style={{ padding: 40, maxWidth: 700 }}>
+    <main style={{ padding: 24, fontFamily: 'system-ui' }}>
       <h1>🎸 Tone Memory</h1>
-      <p>Signed in as {user.email}</p>
 
-      <h2>Create Tone</h2>
+      {userEmail ? (
+        <>
+          <p>✅ Signed in as {userEmail}</p>
+          <button onClick={signOut}>Sign out</button>
+        </>
+      ) : (
+        <>
+          <p>Please sign in</p>
 
-      {Object.keys(form).map((key) => (
-        <input
-          key={key}
-          placeholder={key}
-          value={(form as any)[key]}
-          onChange={(e) =>
-            setForm({ ...form, [key]: e.target.value })
-          }
-          style={{
-            display: 'block',
-            width: '100%',
-            marginBottom: 8,
-            padding: 8,
-          }}
-        />
-      ))}
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            style={{ padding: 10, width: '100%', maxWidth: 360, marginTop: 8 }}
+          />
 
-      <button onClick={saveTone}>Save Tone</button>
+          <div style={{ marginTop: 10 }}>
+            <button onClick={sendLink} disabled={!email}>
+              Send magic link
+            </button>
+          </div>
+        </>
+      )}
 
-      <hr style={{ margin: '30px 0' }} />
-
-      <h2>Your Tones</h2>
-
-      {tones.length === 0 && <p>No tones yet</p>}
-
-      {tones.map((tone) => (
-        <div
-          key={tone.id}
-          style={{
-            border: '1px solid #ccc',
-            padding: 12,
-            marginBottom: 10,
-          }}
-        >
-          <strong>{tone.name}</strong>
-          <div>Amp: {tone.amp}</div>
-          <div>Cab: {tone.cab}</div>
-          <div>Guitar: {tone.guitar}</div>
-          <div>Pedals: {tone.pedals}</div>
-          <div>Notes: {tone.notes}</div>
-          <div>Tags: {tone.tags}</div>
-        </div>
-      ))}
-    </div>
+      {status && <p style={{ marginTop: 12 }}>{status}</p>}
+    </main>
   )
 }
